@@ -79,7 +79,12 @@ namespace socom_2_Discord_Presence
 
             client.SetPresence(presence);
         }
-
+        private void resetPresence()
+        {
+            presence.Timestamps = null;
+            setPresence("Not in a room or in lobby", -1, -1, "NONE", 0);
+            gameStarted = false;
+        }
         private void tmr_CheckPCSX2_Tick(object sender, EventArgs e)
         {
             Process[] pcsx2 = Process.GetProcessesByName(PCSX2PROCESSNAME);
@@ -128,10 +133,13 @@ namespace socom_2_Discord_Presence
                     else
                     {
                         m.writeBytes(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0 });
-                        presence.Timestamps = null;
-                        setPresence("Not in a room or in lobby", -1, -1, "NONE", 0);
-                        gameStarted = false;
+                        resetPresence();
                     }
+                }
+                else
+                {
+                    m.writeBytes(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0 });
+                    resetPresence();
                 }
             }
         }
