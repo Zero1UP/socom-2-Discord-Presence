@@ -107,42 +107,52 @@ namespace socom_2_Discord_Presence
             if (pcsx2Running)
             {
                 m = new MemorySharp(Process.GetProcessesByName(PCSX2PROCESSNAME).First());
-              
-                //Check to make sure that the user is even in a game to begin with
-                if ((m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false) != null) && (!m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false).SequenceEqual(new byte[] { 0, 0, 0, 0 })))
+
+                
+                try
                 {
-                    if (m.Read<byte>(GameHelper.GAME_ENDED_ADDRESS, false) == 0)
+                    //Check to make sure that the user is even in a game to begin with
+                    if ((m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false) != null) && (!m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false).SequenceEqual(new byte[] { 0, 0, 0, 0 })))
                     {
-                        IntPtr playerObjectAddress = new IntPtr(m.Read<int>(GameHelper.PLAYER_POINTER_ADDRESS,false)) + 0x20000000;
-                        short kills = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_KILLS_OFFSET, false);
-                        short deaths = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_DEATHS_OFFSET, false);
-                        string mapID = m.ReadString(GameHelper.CURRENT_MAP_ADDRESS, Encoding.Default, false, 4);
-                        //int customMap = m.readByte(GameHelper.CUSTOM_MAP_ADDRESS);
-                        int sealsRoundsWon = m.Read<byte>(GameHelper.SEAL_WIN_COUNTER_ADDRESS,false);
-                        int terroristRoundsWon = m.Read<byte>(GameHelper.TERRORIST_WIN_COUNTER_ADDRESS, false);
-                        if (!gameStarted)
+                        if (m.Read<byte>(GameHelper.GAME_ENDED_ADDRESS, false) == 0)
                         {
-                            presence.Timestamps = new Timestamps()
+                            IntPtr playerObjectAddress = new IntPtr(m.Read<int>(GameHelper.PLAYER_POINTER_ADDRESS, false)) + 0x20000000;
+                            short kills = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_KILLS_OFFSET, false);
+                            short deaths = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_DEATHS_OFFSET, false);
+                            string mapID = m.ReadString(GameHelper.CURRENT_MAP_ADDRESS, Encoding.Default, false, 4);
+                            //int customMap = m.readByte(GameHelper.CUSTOM_MAP_ADDRESS);
+                            int sealsRoundsWon = m.Read<byte>(GameHelper.SEAL_WIN_COUNTER_ADDRESS, false);
+                            int terroristRoundsWon = m.Read<byte>(GameHelper.TERRORIST_WIN_COUNTER_ADDRESS, false);
+                            if (!gameStarted)
                             {
-                                Start = DateTime.UtcNow
+                                presence.Timestamps = new Timestamps()
+                                {
+                                    Start = DateTime.UtcNow
 
-                            };
+                                };
 
-                            gameStarted = true;
+                                gameStarted = true;
+                            }
+                            setPresence(sealsRoundsWon, terroristRoundsWon, mapID, kills, deaths);
                         }
-                        setPresence(sealsRoundsWon, terroristRoundsWon, mapID,kills,deaths);
+                        else
+                        {
+                            m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 }, false);
+                            resetPresence();
+                        }
                     }
                     else
                     {
-                        m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 },false);
+                        m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 }, false);
                         resetPresence();
                     }
                 }
-                else
+                catch (Exception)
                 {
-                    m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 },false);
+                    //This only happens if the game isn't actually running but pcsx2 is. It would result in a crash but there's no reason to inform the user
                     resetPresence();
                 }
+
             }
         }
     }
