@@ -1,5 +1,4 @@
 ﻿using DiscordRPC;
-using Memory;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -10,20 +9,20 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-
+using Binarysharp.MemoryManagement;
 namespace socom_2_Discord_Presence
 {
     public partial class frm_Main : Form
     {
         private const string PCSX2PROCESSNAME = "pcsx2";
         bool pcsx2Running;
-        Mem m = new Mem();
+        MemorySharp m = null;
 
         bool gameStarted = false;
         private static RichPresence presence = new RichPresence()
         {
             Details = "Not currently in a game.",
-            State = "Room: Not in a room.",
+            State = "",
             Assets = new Assets()
             {
                 LargeImageKey = "default",
@@ -43,7 +42,7 @@ namespace socom_2_Discord_Presence
             client.SetPresence(presence);
         }
 
-        private void setPresence(string roomName, int sealWins, int terrorWins, string mapID, int customMap)
+        private void setPresence(int sealWins, int terrorWins, string mapID,short kills, short deaths)
         {
 
             MapDataModel mapInfo = GameHelper.mapInfo.Find(x => x._mapID == mapID.ToUpper());
@@ -54,70 +53,73 @@ namespace socom_2_Discord_Presence
             }
             else
             {
-                presence.Details = "Seals: " + sealWins.ToString() + " || Terrorist: " + terrorWins.ToString();
+                presence.Details = "Seals: " + sealWins + " || Terrorist: " + terrorWins;
+                presence.State = "Kills: " + kills + " Deaths: " + deaths;
             }
 
-            presence.State = "Room: " + roomName;
+            
 
             presence.Assets = new Assets();
 
-            if (customMap == 1)
-            {
-                presence.Assets.LargeImageKey = mapInfo._altDiscordKey;
-                presence.Assets.SmallImageKey = mapInfo._altDiscordKey;
-                presence.Assets.LargeImageText = mapInfo._altMapName;
-                presence.Assets.SmallImageText = mapInfo._altMapName;
+            //if (customMap == 1)
+            //{
+            //    presence.Assets.LargeImageKey = mapInfo._altDiscordKey;
+            //    presence.Assets.SmallImageKey = mapInfo._altDiscordKey;
+            //    presence.Assets.LargeImageText = mapInfo._altMapName;
+            //    presence.Assets.SmallImageText = mapInfo._altMapName;
 
-            }
-            else
-            {
-                presence.Assets.LargeImageKey = mapInfo._discordKey;
-                presence.Assets.SmallImageKey = mapInfo._discordKey;
-                presence.Assets.LargeImageText = mapInfo._mapName;
-                presence.Assets.SmallImageText = mapInfo._mapName;
-            }
+            //}
+            //else
+
+            presence.Assets.LargeImageKey = mapInfo._discordKey;
+            presence.Assets.SmallImageKey = mapInfo._discordKey;
+            presence.Assets.LargeImageText = mapInfo._mapName;
+            presence.Assets.SmallImageText = mapInfo._mapName;
+
 
             client.SetPresence(presence);
         }
         private void resetPresence()
         {
             presence.Timestamps = null;
-            setPresence("Not in a room or in lobby", -1, -1, "NONE", 0);
+            setPresence(-1, -1, "NONE",-1,-1);
             gameStarted = false;
         }
         private void tmr_CheckPCSX2_Tick(object sender, EventArgs e)
         {
             Process[] pcsx2 = Process.GetProcessesByName(PCSX2PROCESSNAME);
 
+
             if (pcsx2.Length > 0)
             {
                 lbl_PCSX2.Text = "PCSX2 Detected";
                 lbl_PCSX2.ForeColor = Color.FromArgb(20, 192, 90);
                 pcsx2Running = true;
+                return;
             }
-            else
-            {
-                lbl_PCSX2.Text = "Waiting for PCSX2...";
-                lbl_PCSX2.ForeColor = Color.FromArgb(120, 120, 120);  
-                pcsx2Running = false;
-            }
+            lbl_PCSX2.Text = "Waiting for PCSX2...";
+            lbl_PCSX2.ForeColor = Color.FromArgb(120, 120, 120);
+            pcsx2Running = false;
         }
 
         private void tmr_GetPCSX2Data_Tick(object sender, EventArgs e)
         {
             if (pcsx2Running)
             {
-                m.OpenProcess(PCSX2PROCESSNAME + ".exe");
+                m = new MemorySharp(Process.GetProcessesByName(PCSX2PROCESSNAME).First());
+              
                 //Check to make sure that the user is even in a game to begin with
-                if ((m.readBytes(GameHelper.PLAYER_POINTER_ADDRESS, 4) != null) && (!m.readBytes(GameHelper.PLAYER_POINTER_ADDRESS, 4).SequenceEqual(new byte[] { 0, 0, 0, 0 })))
+                if ((m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false) != null) && (!m.Read<byte>(GameHelper.PLAYER_POINTER_ADDRESS, 4, false).SequenceEqual(new byte[] { 0, 0, 0, 0 })))
                 {
-                    if (m.readByte(GameHelper.GAME_ENDED_ADDRESS) == 0)
+                    if (m.Read<byte>(GameHelper.GAME_ENDED_ADDRESS, false) == 0)
                     {
-                        string roomName = ByteConverstionHelper.convertBytesToString(m.readBytes(GameHelper.ROOM_NAME_ADDRESS, 22));
-                        string mapID = ByteConverstionHelper.convertBytesToString(m.readBytes(GameHelper.CURRENT_MAP_ADDRESS, 4));
-                        int customMap = m.readByte(GameHelper.CUSTOM_MAP_ADDRESS);
-                        int sealsRoundsWon = m.readByte(GameHelper.SEAL_WIN_COUNTER_ADDRESS);
-                        int terroristRoundsWon = m.readByte(GameHelper.TERRORIST_WIN_COUNTER_ADDRESS);
+                        IntPtr playerObjectAddress = new IntPtr(m.Read<int>(GameHelper.PLAYER_POINTER_ADDRESS,false)) + 0x20000000;
+                        short kills = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_KILLS_OFFSET, false);
+                        short deaths = m.Read<short>(playerObjectAddress + GameHelper.PLAYER_DEATHS_OFFSET, false);
+                        string mapID = m.ReadString(GameHelper.CURRENT_MAP_ADDRESS, Encoding.Default, false, 4);
+                        //int customMap = m.readByte(GameHelper.CUSTOM_MAP_ADDRESS);
+                        int sealsRoundsWon = m.Read<byte>(GameHelper.SEAL_WIN_COUNTER_ADDRESS,false);
+                        int terroristRoundsWon = m.Read<byte>(GameHelper.TERRORIST_WIN_COUNTER_ADDRESS, false);
                         if (!gameStarted)
                         {
                             presence.Timestamps = new Timestamps()
@@ -128,17 +130,17 @@ namespace socom_2_Discord_Presence
 
                             gameStarted = true;
                         }
-                        setPresence(roomName, sealsRoundsWon, terroristRoundsWon, mapID, customMap);
+                        setPresence(sealsRoundsWon, terroristRoundsWon, mapID,kills,deaths);
                     }
                     else
                     {
-                        m.writeBytes(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0 });
+                        m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 },false);
                         resetPresence();
                     }
                 }
                 else
                 {
-                    m.writeBytes(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0 });
+                    m.Write<byte>(GameHelper.GAME_ENDED_ADDRESS, new byte[] { 0x00 },false);
                     resetPresence();
                 }
             }

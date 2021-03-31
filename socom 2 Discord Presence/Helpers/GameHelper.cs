@@ -8,13 +8,16 @@ namespace socom_2_Discord_Presence
 {
     public static class GameHelper
     {
-        public const string PLAYER_POINTER_ADDRESS = "20440C38";
-        public const string GAME_ENDED_ADDRESS = "20694C44";  //May need to reset this to 0 after it ends, it seems to persist till the next game and doesn't reset when the player loads i
-        public const string CURRENT_MAP_ADDRESS = "20436540"; // Text String of MapID, if not in a game then it is set to NONE
-        public const string SEAL_WIN_COUNTER_ADDRESS = "20695388";
-        public const string TERRORIST_WIN_COUNTER_ADDRESS = "2069539C";
-        public const string ROOM_NAME_ADDRESS = "20E40DDE";
-        public const string CUSTOM_MAP_ADDRESS = "200F71B0";
+        public static IntPtr PLAYER_POINTER_ADDRESS = new IntPtr(0x20435618);
+        public static IntPtr GAME_ENDED_ADDRESS = new IntPtr(0x20694C44);  //May need to reset this to 0 after it ends, it seems to persist till the next game and doesn't reset when the player loads i
+        public static IntPtr CURRENT_MAP_ADDRESS = new IntPtr(0x204417C0); // Text String of MapID, if not in a game then it is set to NONE
+        public static IntPtr SEAL_WIN_COUNTER_ADDRESS = new IntPtr(0x20695388);
+        public static IntPtr TERRORIST_WIN_COUNTER_ADDRESS = new IntPtr(0x2069539C);
+        public static IntPtr ROOM_NAME_ADDRESS = new IntPtr(0x21FFBBE0);
+
+        public static int PLAYER_KILLS_OFFSET = 0x550;
+        public static int PLAYER_DEATHS_OFFSET = 0x556;
+        //public const string CUSTOM_MAP_ADDRESS = "200F71B0";
 
 
         public static List<MapDataModel> mapInfo = new List<MapDataModel>
